@@ -1,5 +1,4 @@
 import torch
-from pose_estimation.superpoint import SuperPoint
 from typing import Sequence
 from torchvision import transforms
 
@@ -15,10 +14,6 @@ def create_backbone(
         model = torch.hub.load("facebookresearch/dinov2", "dinov2_vits14")
         wh = (16, 16)
         num_features = 384
-    else:
-        model = SuperPoint()
-        wh = (28, 28)
-        num_features = 256
     return model, wh, num_features
 
 # Use timm's names
@@ -34,8 +29,6 @@ def make_normalize_transform(
 class BackboneWrapper(torch.nn.Module):
     def __init__(self, backbone_type: str = "dino") -> None:
         super().__init__()
-
-        assert backbone_type in ["dino", "superpoint"]
 
         self.image_preprocessing_net, backbone_wh, img_num_features = create_backbone(
             type=backbone_type, pretrained=True

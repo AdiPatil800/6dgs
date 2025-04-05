@@ -11,11 +11,10 @@ from pose_estimation.error_computation import (
 from statistics import mean
 
 from pose_estimation.line_intersection import (
-    ransac_line_intersection,  # Add this import
+    compute_line_intersection_impl2,
     exclude_negatives,
     make_rotation_mat,
 )
-
 from scene.scene_structure import CameraInfo
 from utils.graphics_utils import fov2focal
 import numpy as np
@@ -120,11 +119,7 @@ def test_pose_estimation(
                 model_up=camera_up_dir,
             )
             avg_score = avg_score.item()
-            num_weights = weights.size(0)
-
-            k = min(100, num_weights)
-
-            target_idx = torch.topk(weights, k).indices
+            target_idx = torch.topk(weights, k=100).indices
             intersection = torch.count_nonzero(torch.isin(target_idx, idx))
             recall = intersection.item() / target_idx.shape[0]
 
@@ -169,17 +164,25 @@ def test_pose_estimation(
         if save and (img_idx == 0 or save_all):
             saving_dict["topk_unique_ray_idx"] = idx.cpu()
             saving_dict["topk_unique_weights"] = weights.cpu()
-        # Optionally normalize weights if you plan to pass them
-        weights = torch.divide(weights, torch.sum(weights))
 
-        camera_optical_center = ransac_line_intersection(
-            rays_ori[idx],
-            rays_dirs[idx],
-            weights=weights,  # You can pass weights if available
-            max_iterations=100,  # You can adjust RANSAC parameters as needed
-            error_threshold=1e-3,
-            minimal_sample_size=3
+        weights = torch.divide(weights, torch.sum(weights))
+        camera_optical_center = compute_line_intersection_impl2(
+            rays_ori[idx], rays_dirs[idx]  # , weights=weights
         )
+        weights = torch.multiply(
+            weights,
+            exclude_negatives(camera_optical_center, rays_ori[idx], rays_dirs[idx]),
+        )
+        weights = torch.divide(weights, torch.sum(weights))
+        camera_optical_center = compute_line_intersection_impl2(
+            rays_ori[idx], rays_dirs[idx]  # , weights=weights
+        )
+        # camera_optical_center = compute_line_intersection_impl2(
+        #     rays_ori[idx], rays_dirs[idx]
+        # )
+
+        if torch.isnan(camera_optical_center).any(dim=0):
+            print("camera_optical_center is nan")
 
         camera_watch_dir = torch.multiply(rays_dirs[idx], weights[:, None]).sum(dim=0)
         camera_watch_dir = torch.divide(

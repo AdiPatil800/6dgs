@@ -1,7 +1,7 @@
 #!/bin/sh
 
-python3 train.py -s /data/datasets/TanksAndTemple/Barn
-python3 train.py -s /data/datasets/TanksAndTemple/Caterpillar
-python3 train.py -s /data/datasets/TanksAndTemple/Family
-python3 train.py -s /data/datasets/TanksAndTemple/Ignatius
-python3 train.py -s /data/datasets/TanksAndTemple/Truck
+python3 train.py -s ~/TanksAndTemple/Barn
+python3 train.py -s ~/TanksAndTemple/Caterpillar
+python3 train.py -s ~/TanksAndTemple/Family
+python3 train.py -s ~/TanksAndTemple/Ignatius
+python3 train.py -s ~/TanksAndTemple/Truck

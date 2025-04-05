@@ -78,18 +78,21 @@ class IdentificationModule(torch.nn.Module):
         features_img_w_pe_flat, features_img_flat, features_img = self.backbone_wrapper(img, mask)
         features_rays = self.ray_preprocessor(rays_ori, rays_dir, rays_rgb)
         attention_map = self.attention(features_img_w_pe_flat, features_rays, mask=None)
-        # score = 1.0 - torch.prod(1.0 - attention_map, dim=0)
-        score = torch.sum(attention_map, dim=0)
+        # attention_map: [batch_size, num_heads, seq_len_img, seq_len_rays]
 
-        new_cam_up_dir = self.camera_direction_prediction_network(
-            features_img
-        )
+        # Compute the score by summing over the image sequence length and averaging over heads
+        score = attention_map.sum(dim=2).mean(dim=1)  # [batch_size, seq_len_rays]
+
+        new_cam_up_dir = self.camera_direction_prediction_network(features_img)
         if self.camera_up_out_augmentation is not None:
-            camera_up_dir = torch.nn.functional.normalize(self.camera_up_out_augmentation(new_cam_up_dir), dim=-1)
+            camera_up_dir = torch.nn.functional.normalize(
+                self.camera_up_out_augmentation(new_cam_up_dir), dim=-1
+            )
         else:
             camera_up_dir = torch.nn.functional.normalize(new_cam_up_dir, dim=-1)
 
         return score, attention_map, features_img_flat, camera_up_dir
+
 
     def forward(
         self,
@@ -128,6 +131,14 @@ class IdentificationModule(torch.nn.Module):
             img, mask, rays_ori, rays_dir, rays_rgb
         )
 
-        chunk_topk = torch.topk(scores, k=rays_to_output)
+        # Get the number of scores
+        num_scores = scores.size(0)
+
+        # Adjust k to not exceed the number of scores
+        k = min(rays_to_output, num_scores)
+
+        # Now use k in torch.topk
+        chunk_topk = torch.topk(scores, k=k)
 
         return chunk_topk.indices, chunk_topk.values, scores, camera_up_dir, attention_map
+
